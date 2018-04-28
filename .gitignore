@@ -1,0 +1,5 @@
+# VSCode workspace files
+/.vscode
+
+# Files generated while testing
+/.tmp

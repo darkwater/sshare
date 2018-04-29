@@ -1,97 +1,102 @@
 package main
 
 import (
-	"fmt"
+	"errors"
 	"io"
-	"log"
 	"math/rand"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/labstack/echo"
+	"github.com/labstack/echo/middleware"
 )
 
-type handler struct {
+var config struct {
+	rootURL          string
 	storagePath      string
 	storagePerm      int
-	users            map[string]string
 	randomCharacters string
 	filenameLength   int
 }
 
-func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	reader, err := r.MultipartReader()
-	if err != nil {
-		fmt.Fprintf(w, "expected a multipart/form-data POST request")
-		return
-	}
-
-	key := r.Header["Key"][0]
-	if key == "" {
-		fmt.Fprintf(w, "please send a 'Key' header with your sshare key")
-		return
-	}
-
-	user := h.users[key]
-	if key == "" {
-		fmt.Fprintf(w, "unknown sshare key")
-		return
-	}
-
-	userPath := h.storagePath + "/" + user + "/"
-	os.MkdirAll(userPath, 0755)
-
-	fileWritten := false
-
-	for {
-		part, err := reader.NextPart()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			fmt.Fprintf(w, "unexpected error while reading multipart form data")
-			return
-		}
-
-		switch part.FormName() {
-		case "contents":
-			if fileWritten {
-				continue
-			}
-
-			filename := h.generateFilename()
-
-			if i := strings.IndexRune(part.FileName(), '.'); i > 0 {
-				// intentionally don't match a dot at the start of the filename
-				filename += part.FileName()[i:]
-			}
-
-			// TODO: handle collisions
-			filepath := userPath + filename
-			file, err := os.Create(filepath)
-			if err != nil {
-				println(err)
-				return
-			}
-			defer file.Close()
-
-			written, err := io.Copy(file, part)
-			if err != nil {
-				println(err)
-				return
-			}
-			_ = written
-
-			fileWritten = true
-		}
-	}
+var store struct {
+	users map[string]string
 }
 
-func (h handler) generateFilename() string {
+type user string
+
+type response struct {
+	URL string `json:"url"`
+}
+
+func getUser(key string) (string, error) {
+	if key == "" {
+		return "", errors.New("invalid sshare key")
+	}
+
+	user := store.users[key]
+	if key == "" {
+		return "", errors.New("unknown sshare key")
+	}
+
+	return user, nil
+}
+
+func handleUpload(c echo.Context) error {
+	// auth user
+	user, err := getUser(c.Request().Header["Key"][0])
+	if err != nil {
+		return err
+	}
+
+	userpath := config.storagePath + "/" + user + "/"
+	os.MkdirAll(userpath, 0755)
+
+	// open input file
+	file, err := c.FormFile("contents")
+	if err != nil {
+		return err
+	}
+	src, err := file.Open()
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	// create output file
+	filename := generateFilename()
+	if i := strings.IndexRune(file.Filename, '.'); i > 0 {
+		// add original extension
+		// intentionally don't match a dot at the start of the filename
+		filename += file.Filename[i:]
+	}
+	dst, err := os.Create(userpath + filename)
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+
+	// write to file
+	_, err = io.Copy(dst, src)
+	if err != nil {
+		return err
+	}
+
+	res := response{
+		URL: config.rootURL + user + "/" + filename,
+	}
+
+	return c.JSON(http.StatusOK, res)
+}
+
+func generateFilename() string {
+	// TODO: check for collisions
 	for {
-		name := make([]byte, h.filenameLength)
+		name := make([]byte, config.filenameLength)
 		for i := range name {
-			name[i] = h.randomCharacters[rand.Intn(len(h.randomCharacters))]
+			name[i] = config.randomCharacters[rand.Intn(len(config.randomCharacters))]
 		}
 
 		return string(name)
@@ -101,17 +106,22 @@ func (h handler) generateFilename() string {
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	h := handler{
-		storagePath: "/tmp/sshare",
-		storagePerm: 0755,
-		users: map[string]string{
-			"deadbeef": "xf",
-		},
-		randomCharacters: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
-		filenameLength:   5,
+	e := echo.New()
+
+	config.rootURL = "https://172.24.0.3:3636/"
+	config.storagePath = "/tmp/sshare"
+	config.storagePerm = 0755
+	config.randomCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	config.filenameLength = 5
+
+	store.users = map[string]string{
+		"deadbeef": "xf",
 	}
 
-	http.Handle("/upload", h)
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
 
-	log.Fatal(http.ListenAndServe(":3636", nil))
+	e.POST("/upload", handleUpload)
+
+	e.Logger.Fatal(e.Start("172.24.0.3:3636"))
 }

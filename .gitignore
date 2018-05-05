@@ -1,3 +1,6 @@
+# VSCode workflow
 /.vscode
 /debug
-/s
+
+# screenshot folders default location
+/public/*/

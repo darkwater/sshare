@@ -9,7 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/sessions"
 	"github.com/labstack/echo"
+	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/middleware"
 )
 
@@ -18,6 +20,7 @@ var config struct {
 	storagePath      string
 	storagePerm      int
 	randomCharacters string
+	userLength       int
 	filenameLength   int
 }
 
@@ -93,14 +96,12 @@ func handleUpload(c echo.Context) error {
 
 func generateFilename() string {
 	// TODO: check for collisions
-	for {
-		name := make([]byte, config.filenameLength)
-		for i := range name {
-			name[i] = config.randomCharacters[rand.Intn(len(config.randomCharacters))]
-		}
-
-		return string(name)
+	name := make([]byte, config.filenameLength)
+	for i := range name {
+		name[i] = config.randomCharacters[rand.Intn(len(config.randomCharacters))]
 	}
+
+	return string(name)
 }
 
 func main() {
@@ -108,8 +109,8 @@ func main() {
 
 	e := echo.New()
 
-	config.rootURL = "https://172.24.0.3:3636/"
-	config.storagePath = "/tmp/sshare"
+	config.rootURL = "http://172.24.0.2:3636/"
+	config.storagePath = "storage"
 	config.storagePerm = 0755
 	config.randomCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	config.filenameLength = 5
@@ -121,7 +122,26 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
+	e.Use(session.Middleware(sessions.NewCookieStore([]byte("secret"))))
+
+	// serve web interface
+	e.Static("/", "public")
+
+	// upload endpoint
 	e.POST("/upload", handleUpload)
 
-	e.Logger.Fatal(e.Start("172.24.0.3:3636"))
+	// API endpoint
+	e.POST("/api", func(c echo.Context) error {
+		sess, _ := session.Get("session", c)
+		sess.Options = &sessions.Options{
+			Path:     "/",
+			MaxAge:   86400 * 7,
+			HttpOnly: true,
+		}
+		sess.Values["foo"] = "bar"
+		sess.Save(c.Request(), c.Response())
+		return c.NoContent(http.StatusOK)
+	})
+
+	e.Logger.Fatal(e.Start("172.24.0.2:3636"))
 }

@@ -3,3 +3,9 @@
 
 # Files generated while testing
 /.tmp
+
+# Generated protobuf code
+*.pb.go
+
+# Certificates etc
+*.pem

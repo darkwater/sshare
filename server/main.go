@@ -1,9 +1,13 @@
 package main
 
 import (
+	"crypto/rand"
 	"crypto/tls"
-	"io/ioutil"
+	"fmt"
 	"net"
+
+	"github.com/darkwater/sshare/common"
+	proto "github.com/golang/protobuf/proto"
 )
 
 func main() {
@@ -30,12 +34,34 @@ func main() {
 }
 
 func handle(conn net.Conn) {
-	out, err := ioutil.ReadAll(conn)
+	// TODO: This algorithm is similar to SSHv1, but SSHv2 uses a different
+	// algorithm - why?
+	challenge := &common.AuthChallenge{
+		Nonce: make([]byte, 16),
+	}
+
+	// Generate a random 32-byte challenge
+	rand.Read(challenge.Nonce)
+
+	common.SendMessage(conn, common.MsgAuthChallenge, challenge)
+
+	// Read response
+	msgtype, msg, err := common.ReadMessage(conn)
 	if err != nil {
 		panic(err)
 	}
 
-	println(string(out))
-	conn.Write(out)
+	// Assert that the message we got is a response
+	if msgtype != common.MsgAuthResponse {
+		panic("unexpected msgtype " + string(msgtype))
+	}
+
+	response := &common.AuthResponse{}
+	if err := proto.Unmarshal(msg, response); err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("Response: %x\n", response.Signature)
+
 	conn.Close()
 }

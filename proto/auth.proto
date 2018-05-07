@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package common;
+
+// Sent by server to client at the start of a connection
+message AuthChallenge {
+    bytes nonce = 1;
+}
+
+// Sent by client to server to attempt authentication
+message AuthResponse {
+    bytes signature = 1;
+}
+
+// Send by server back to client to indicate whether authentication succeeded
+message AuthResult {
+    bool success = 1;
+}
+
+message PrivateKey {
+    PublicKey       public = 1;
+    string          d      = 2;
+    repeated string primes = 3;
+}
+
+message PublicKey {
+    string n = 1;
+    int64  e = 2;
+}

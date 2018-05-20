@@ -2,7 +2,9 @@ package common
 
 import (
 	"crypto/rsa"
+	"crypto/sha256"
 	"math/big"
+	"strconv"
 )
 
 // ToProtobuf populates the message's fields from a crypto/rsa PrivateKey
@@ -38,6 +40,7 @@ func (p *PrivateKey) FromProtobuf() *rsa.PrivateKey {
 func (p *PublicKey) ToProtobuf(key *rsa.PublicKey) {
 	p.N = key.N.Text(62)
 	p.E = int64(key.E)
+	// p.hash = HashPublicKey(key)
 }
 
 // FromProtobuf creates a crypto/rsa PublicKey from this protobuf message
@@ -50,4 +53,11 @@ func (p *PublicKey) FromProtobuf() *rsa.PublicKey {
 	pubkey.N.SetString(p.N, 62)
 
 	return &pubkey
+}
+
+// HashPublicKey uses SHA-256 to create a hash of the public key
+func HashPublicKey(key *rsa.PublicKey) [sha256.Size]byte {
+	str := key.N.Text(62) + "-" + strconv.Itoa(key.E)
+	hash := sha256.Sum256([]byte(str))
+	return hash
 }

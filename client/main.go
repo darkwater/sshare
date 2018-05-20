@@ -8,9 +8,9 @@ import (
 	"io/ioutil"
 	"net"
 
-	"github.com/golang/protobuf/proto"
-
 	"github.com/darkwater/sshare/common"
+
+	"github.com/golang/protobuf/proto"
 )
 
 func main() {
@@ -45,24 +45,27 @@ func handle(conn net.Conn) {
 	}
 
 	// Assert that the message we got is a challenge
-	if msgtype != common.MsgAuthChallenge {
+	if msgtype != common.MsgWelcome {
 		panic("unexpected msgtype " + string(msgtype))
 	}
 
-	challenge := &common.AuthChallenge{}
-	if err := proto.Unmarshal(msg, challenge); err != nil {
+	welcome := &common.Welcome{}
+	if err := proto.Unmarshal(msg, welcome); err != nil {
 		panic(err)
 	}
 
-	fmt.Printf("Challenge nonce: %x\n", challenge.Nonce)
+	fmt.Printf("Challenge nonce: %x\n", welcome.AuthChallenge)
 
 	// Sign nonce
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	key, err := LoadPrivateKey()
 	if err != nil {
 		panic(err)
 	}
 
-	signature, err := rsa.SignPKCS1v15(rand.Reader, key, 0, challenge.Nonce)
+	hash := common.HashPublicKey(&key.PublicKey)
+	fmt.Printf("hash: %x\n", hash)
+
+	signature, err := rsa.SignPKCS1v15(rand.Reader, key, 0, welcome.AuthChallenge)
 	if err != nil {
 		panic(err)
 	}

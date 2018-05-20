@@ -9,13 +9,12 @@ import (
 
 // The first byte of a network message indicates its type
 const (
-	MsgAuthChallenge byte = iota
+	MsgWelcome byte = iota
 	MsgAuthResponse
 	MsgAuthResult
 )
 
-// SendMessage sends a protobuf message along with a header containing its type
-// and length
+// SendMessage sends a protobuf message along with a header containing its type and length
 func SendMessage(dst io.Writer, msgtype byte, msg proto.Message) {
 	out, err := proto.Marshal(msg)
 	if err != nil {
@@ -30,6 +29,7 @@ func SendMessage(dst io.Writer, msgtype byte, msg proto.Message) {
 	dst.Write(out)
 }
 
+// ReadMessage reads a protobuf message along with a header containing its type and length
 func ReadMessage(src io.Reader) (byte, []byte, error) {
 	header := make([]byte, 5)
 	src.Read(header)

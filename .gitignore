@@ -7,5 +7,6 @@
 # Generated protobuf code
 *.pb.go
 
-# Certificates etc
+# Certificates, databases etc
 *.pem
+*.db

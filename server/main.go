@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	err := initDatabase()
+	err := dbInit()
 	if err != nil {
 		panic(err)
 	}

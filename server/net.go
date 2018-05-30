@@ -35,7 +35,9 @@ func startListening() (net.Listener, error) {
 
 func welcome(conn net.Conn) (int, error) {
 	welcome := &common.Welcome{
-		AuthChallenge: make([]byte, 16),
+		Url:             "s.dark.red",
+		AcceptsNewUsers: true,
+		AuthChallenge:   make([]byte, 16),
 	}
 
 	// Create an auth challenge
@@ -60,18 +62,43 @@ func welcome(conn net.Conn) (int, error) {
 
 		return authenticateClient(response, conn)
 
+	case common.MsgInviteUse:
+		// Attempt registration
+		response := &common.InviteUse{}
+		if err := proto.Unmarshal(msg, response); err != nil {
+			return 0, err
+		}
+
+		return useInvite(response, conn)
+
 	default:
 		// Invalid response
 		return 0, errors.New("invalid response to welcome")
 	}
 }
 
-// authenticateClient
 func authenticateClient(msg *common.AuthResponse, conn net.Conn) (int, error) {
 	// TODO: This algorithm is similar to SSHv1, but SSHv2 uses a different
 	// algorithm - why?
 
 	fmt.Printf("Response: %x\n", msg.Signature)
+
+	return 0, nil
+}
+
+func useInvite(msg *common.InviteUse, conn net.Conn) (int, error) {
+	invite, err := dbGetInvite(msg.Code)
+	if err != nil {
+		return 0, errors.New("invalid invitation code")
+	}
+
+	user := &User{
+		URL:       "xf",
+		InvitedBy: invite.Sender,
+	}
+
+	dbUseInvite(invite, user)
+	dbAddPublicKey(user, msg.Key)
 
 	return 0, nil
 }

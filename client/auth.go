@@ -24,6 +24,7 @@ func getPrivateKeyPath() string {
 func LoadPrivateKey() (*rsa.PrivateKey, error) {
 	keyFile, err := ioutil.ReadFile(getPrivateKeyPath())
 	if err != nil {
+		// TODO: Handle errors other than 'file does not exist'
 		return CreatePrivateKey()
 	}
 

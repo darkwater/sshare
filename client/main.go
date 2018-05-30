@@ -1,12 +1,11 @@
 package main
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
 	"fmt"
 	"io/ioutil"
 	"net"
+	"time"
 
 	"github.com/darkwater/sshare/common"
 
@@ -44,7 +43,7 @@ func handle(conn net.Conn) {
 		panic(err)
 	}
 
-	// Assert that the message we got is a challenge
+	// Assert that the message we got is a Welcome
 	if msgtype != common.MsgWelcome {
 		panic("unexpected msgtype " + string(msgtype))
 	}
@@ -56,7 +55,6 @@ func handle(conn net.Conn) {
 
 	fmt.Printf("Challenge nonce: %x\n", welcome.AuthChallenge)
 
-	// Sign nonce
 	key, err := LoadPrivateKey()
 	if err != nil {
 		panic(err)
@@ -65,15 +63,27 @@ func handle(conn net.Conn) {
 	hash := common.HashPublicKey(&key.PublicKey)
 	fmt.Printf("hash: %x\n", hash)
 
-	signature, err := rsa.SignPKCS1v15(rand.Reader, key, 0, welcome.AuthChallenge)
-	if err != nil {
-		panic(err)
-	}
-
 	// Create response
-	response := &common.AuthResponse{
-		Signature: signature,
+	response := &common.InviteUse{
+		Code: "68a630c4a1e2460eb8aaf97f6acd2259be07c8dc302fb7fcf47a807248135e85",
+		Key:  &common.PublicKey{},
 	}
+	response.Key.ToProtobuf(&key.PublicKey)
 
-	common.SendMessage(conn, common.MsgAuthResponse, response)
+	common.SendMessage(conn, common.MsgInviteUse, response)
+
+	// // Sign nonce
+	// signature, err := rsa.SignPKCS1v15(rand.Reader, key, 0, welcome.AuthChallenge)
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// // Create response
+	// response := &common.AuthResponse{
+	// 	Signature: signature,
+	// }
+
+	// common.SendMessage(conn, common.MsgAuthResponse, response)
+
+	time.Sleep(300 * time.Millisecond)
 }

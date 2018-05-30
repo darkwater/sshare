@@ -40,7 +40,6 @@ func (p *PrivateKey) FromProtobuf() *rsa.PrivateKey {
 func (p *PublicKey) ToProtobuf(key *rsa.PublicKey) {
 	p.N = key.N.Text(62)
 	p.E = int64(key.E)
-	// p.hash = HashPublicKey(key)
 }
 
 // FromProtobuf creates a crypto/rsa PublicKey from this protobuf message

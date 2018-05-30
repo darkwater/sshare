@@ -10,6 +10,8 @@ import (
 // The first byte of a network message indicates its type
 const (
 	MsgWelcome byte = iota
+	MsgInviteUse
+	MsgInviteResult
 	MsgAuthResponse
 	MsgAuthResult
 )
